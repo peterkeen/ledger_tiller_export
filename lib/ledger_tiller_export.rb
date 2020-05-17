@@ -42,6 +42,7 @@ module LedgerTillerExport
   end
 
   class RegexpRule < T::Struct
+    extend T::Sig
     include RuleInterface
 
     const :match, Regexp
