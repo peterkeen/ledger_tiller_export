@@ -1,6 +1,6 @@
 # coding: utf-8
 # typed: strict
-# coding: utf-8
+
 require 'ledger_tiller_export/version'
 require 'ledger_gen'
 require 'set'
@@ -58,29 +58,59 @@ module LedgerTillerExport
     end
   end
 
-  class Exporter < T::Struct
+  class Exporter
     extend T::Sig
 
-    const :rules, T::Array[RuleInterface]
-    const :spreadsheet, String
-    const :worksheet, String, default: 'Transactions'
-    const :default_account, String, default: 'Expenses:Misc'
-    const :ledger_pretty_print_options, String, default: '--sort=date'
+    sig {returns(T::Array[RuleInterface])}
+    attr_reader :rules
+
+    sig {returns(String)}
+    attr_reader :spreadsheet
+
+    sig {returns(String)}
+    attr_reader :worksheet
+
+    sig {returns(String)}
+    attr_reader :default_account
+
+    sig {returns(String)}
+    attr_reader :ledger_pretty_print_options
+
+    sig {returns(GoogleDrive::Session)}
+    attr_reader :session
+
+    sig {returns(LedgerGen::Journal)}
+    attr_reader :journal
+
+    sig do
+      params(
+        rules: T::Array[RuleInterface],
+        spreadsheet: String,
+        worksheet: String,
+        default_account: String,
+        ledger_pretty_print_options: String,
+        ledger_date_format: String,
+      ).void
+    end
+    def initialize(rules:, spreadsheet:, worksheet: 'Transactions', default_account: 'Expenses:Misc', ledger_pretty_print_options: '--sort=date', ledger_date_format: '%m/%d')
+      @rules = T.let(rules, T::Array[RuleInterface])
+      @spreadsheet = T.let(spreadsheet, String)
+      @worksheet = T.let(worksheet, String)
+      @default_account = T.let(default_account, String)
+      @ledger_pretty_print_options = T.let(ledger_pretty_print_options, String)
+
+      @session = T.let(GoogleDrive::Session.from_config('.config.json'), GoogleDrive::Session)
+      @journal = T.let(LedgerGen::Journal.new, LedgerGen::Journal)
+
+      journal.date_format = ledger_date_format
+    end
 
     sig {void}
     def run
-      @session = T.let(GoogleDrive::Session.from_config('.config.json'), T.nilable(GoogleDrive::Session))
-      @journal = T.let(LedgerGen::Journal.new, T.nilable(LedgerGen::Journal))
-
       @known_transactions = T.let(fetch_known_transactions, T.nilable(T::Set[String]))
-
-      @session = T.must(@session)
-      @journal = T.must(@journal)
       @known_transactions = T.must(@known_transactions)
 
-      @journal.date_format = '%m/%d'
-
-      worksheets = @session.spreadsheet_by_key(spreadsheet).worksheets
+      worksheets = session.spreadsheet_by_key(spreadsheet).worksheets
 
       ws = worksheets.detect { |w| w.title == worksheet }
       raw_csv = ws.export_as_string.force_encoding('utf-8')
@@ -95,7 +125,7 @@ module LedgerTillerExport
         journal_transaction(row)
       end
 
-      puts @journal.pretty_print(ledger_pretty_print_options)
+      puts @journal.pretty_print(@ledger_pretty_print_options)
     end
 
     sig {params(row: Row).returns(T::Boolean)}
@@ -135,7 +165,7 @@ module LedgerTillerExport
 
     sig {params(row: Row).void}
     def journal_transaction(row)
-      T.must(@journal).transaction do |txn|
+      journal.transaction do |txn|
         txn.cleared!
         txn.date row.txn_date
         txn.payee row.description
