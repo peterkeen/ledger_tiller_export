@@ -47,7 +47,7 @@ GEM
       mini_portile2 (~> 2.4.0)
     os (1.1.0)
     public_suffix (4.0.5)
-    rake (10.5.0)
+    rake (13.0.1)
     representable (3.0.4)
       declarative (< 0.1.0)
       declarative-option (< 0.2.0)
@@ -83,7 +83,7 @@ PLATFORMS
 DEPENDENCIES
   bundler (~> 1.16)
   ledger_tiller_export!
-  rake (~> 10.0)
+  rake (~> 13.0)
   rspec (~> 3.0)
   sorbet
 
