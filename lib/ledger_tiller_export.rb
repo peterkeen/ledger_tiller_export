@@ -102,7 +102,7 @@ module LedgerTillerExport
       @session = T.let(GoogleDrive::Session.from_config('.config.json'), GoogleDrive::Session)
       @journal = T.let(LedgerGen::Journal.new, LedgerGen::Journal)
 
-      journal.date_format = ledger_date_format
+      @journal.date_format = ledger_date_format
     end
 
     sig {void}
