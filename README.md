@@ -91,7 +91,7 @@ class CheckingAccountRule
   end
   
   CHECKING_ACCOUNTS = T.let([
-    CheckingAccount.new(account: 'Assets:SomeBank:Checking', check_account_prefix: 'Liabilities:Checks:SomeBank),
+    CheckingAccount.new(account: 'Assets:SomeBank:Checking', check_account_prefix: 'Liabilities:Checks:SomeBank'),
     CheckingAccount.new(account: 'Assets:OtherBank:Checking', check_account_prefix: 'Liabilities:Checks:OtherBank'),
   ], T::Array[CheckingAccount])
 
