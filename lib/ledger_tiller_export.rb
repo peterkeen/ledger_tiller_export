@@ -41,8 +41,12 @@ module LedgerTillerExport
     def account_for_row(row); end
   end
 
-  class RegexpRule < T::Struct
+  class RegexpRule
     extend T::Sig
+
+    include T::Props
+    include T::Props::Constructor
+
     include RuleInterface
 
     const :match, Regexp
@@ -61,26 +65,17 @@ module LedgerTillerExport
   class Exporter
     extend T::Sig
 
-    sig {returns(T::Array[RuleInterface])}
-    attr_reader :rules
+    include T::Props
+    include T::Props::Constructor
 
-    sig {returns(String)}
-    attr_reader :spreadsheet
+    const :rules, T::Array[RuleInterface]
+    const :spreadsheet, String
+    const :worksheet, String
+    const :default_account, String
+    const :ledger_pretty_print_options, String
 
-    sig {returns(String)}
-    attr_reader :worksheet
-
-    sig {returns(String)}
-    attr_reader :default_account
-
-    sig {returns(String)}
-    attr_reader :ledger_pretty_print_options
-
-    sig {returns(GoogleDrive::Session)}
-    attr_reader :session
-
-    sig {returns(LedgerGen::Journal)}
-    attr_reader :journal
+    const :session, GoogleDrive::Session, factory: ->{GoogleDrive::Session.from_config('.config.json')}
+    const :journal, LedgerGen::Journal, factory: ->{LedgerGen::Journal.new}
 
     sig do
       params(
@@ -93,16 +88,15 @@ module LedgerTillerExport
       ).void
     end
     def initialize(rules:, spreadsheet:, worksheet: 'Transactions', default_account: 'Expenses:Misc', ledger_pretty_print_options: '--sort=date', ledger_date_format: '%m/%d')
-      @rules = T.let(rules, T::Array[RuleInterface])
-      @spreadsheet = T.let(spreadsheet, String)
-      @worksheet = T.let(worksheet, String)
-      @default_account = T.let(default_account, String)
-      @ledger_pretty_print_options = T.let(ledger_pretty_print_options, String)
+      super(
+        rules: rules,
+        spreadsheet: spreadsheet,
+        worksheet: worksheet,
+        default_account: default_account,
+        ledger_pretty_print_options: ledger_pretty_print_options,
+      )
 
-      @session = T.let(GoogleDrive::Session.from_config('.config.json'), GoogleDrive::Session)
-      @journal = T.let(LedgerGen::Journal.new, LedgerGen::Journal)
-
-      @journal.date_format = ledger_date_format
+      self.journal.date_format = ledger_date_format
     end
 
     sig {void}
@@ -125,7 +119,7 @@ module LedgerTillerExport
         journal_transaction(row)
       end
 
-      puts @journal.pretty_print(@ledger_pretty_print_options)
+      puts journal.pretty_print(ledger_pretty_print_options)
     end
 
     sig {params(row: Row).returns(T::Boolean)}
