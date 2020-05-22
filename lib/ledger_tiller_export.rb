@@ -13,11 +13,11 @@ module LedgerTillerExport
   class Row < T::Struct
     extend T::Sig
 
-    prop :txn_date, Date
-    prop :txn_id, String
-    prop :account, String
-    prop :amount, Float
-    prop :description, String
+    const :txn_date, Date
+    const :txn_id, String
+    const :account, String
+    const :amount, Float
+    const :description, String
 
     sig {params(row: T::Hash[String, T.nilable(String)]).returns(Row)}
     def self.from_csv_row(row)
