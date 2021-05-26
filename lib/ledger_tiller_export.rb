@@ -31,6 +31,11 @@ module LedgerTillerExport
     end
   end
 
+  class Sheet < T::Struct
+    const :spreadsheet, String
+    const :worksheet, String, default: 'Transactions'
+  end
+
   module RuleInterface
     extend T::Sig
     extend T::Helpers
@@ -69,8 +74,7 @@ module LedgerTillerExport
     include T::Props::Constructor
 
     const :rules, T::Array[RuleInterface]
-    const :spreadsheet, String
-    const :worksheet, String
+    const :sheets, T::Array[Sheet]
     const :default_account, String
     const :ledger_pretty_print_options, String
 
@@ -80,18 +84,23 @@ module LedgerTillerExport
     sig do
       params(
         rules: T::Array[RuleInterface],
-        spreadsheet: String,
-        worksheet: String,
+        spreadsheet: T.nilable(String),
+        worksheet: T.nilable(String),
+        sheets: T.nilable(T::Array[Sheet]),
         default_account: String,
         ledger_pretty_print_options: String,
         ledger_date_format: String,
       ).void
     end
-    def initialize(rules:, spreadsheet:, worksheet: 'Transactions', default_account: 'Expenses:Misc', ledger_pretty_print_options: '--sort=date', ledger_date_format: '%m/%d')
+    def initialize(rules:, spreadsheet: nil, worksheet: 'Transactions', sheets: [], default_account: 'Expenses:Misc', ledger_pretty_print_options: '--sort=date', ledger_date_format: '%m/%d')
+
+      if spreadsheet && worksheet
+        sheets << Sheet.new(spreadsheet: spreadsheet, worksheet: worksheet)
+      end
+      
       super(
         rules: rules,
-        spreadsheet: spreadsheet,
-        worksheet: worksheet,
+        sheets: sheets,
         default_account: default_account,
         ledger_pretty_print_options: ledger_pretty_print_options,
       )
@@ -104,19 +113,20 @@ module LedgerTillerExport
       @known_transactions = T.let(fetch_known_transactions, T.nilable(T::Set[String]))
       @known_transactions = T.must(@known_transactions)
 
-      worksheets = session.spreadsheet_by_key(spreadsheet).worksheets
+      sheets.each do |sheet|
+        worksheets = session.spreadsheet_by_key(sheet.spreadsheet).worksheets
 
-      ws = worksheets.detect { |w| w.title == worksheet }
-      raw_csv = ws.export_as_string.force_encoding('utf-8')
-      csv = CSV.parse(raw_csv, headers: true)
+        ws = worksheets.detect { |w| w.title == sheet.worksheet }
+        raw_csv = ws.export_as_string.force_encoding('utf-8')
+        csv = CSV.parse(raw_csv, headers: true)
 
-      T.must(csv).each do |raw_row|
-        row = Row.from_csv_row(raw_row.to_h)
+        T.must(csv).each do |raw_row|
+          row = Row.from_csv_row(raw_row.to_h)
 
-        next if @known_transactions.include?(row.txn_id)
-        next if skip_row?(row)
-
-        journal_transaction(row)
+          next if @known_transactions.include?(row.txn_id)
+          next if skip_row?(row)
+          journal_transaction(row)
+        end
       end
 
       puts journal.pretty_print(ledger_pretty_print_options)
