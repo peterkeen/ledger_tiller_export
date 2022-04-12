@@ -36,31 +36,69 @@ module LedgerTillerExport
     const :worksheet, String, default: 'Transactions'
   end
 
-  module RuleInterface
+  class AbstractRule < T::InexactStruct
     extend T::Sig
     extend T::Helpers
 
-    interface!
+    abstract!
 
-    sig {abstract.params(row: Row).returns(T.nilable(String))}
-    def account_for_row(row); end
+    sig {abstract.params(txn: LedgerGen::Transaction, row: Row).returns(T::Boolean)}
+    def build_transaction(txn, row); end
   end
 
-  class RegexpRule
+  class DefaultRule < AbstractRule
     extend T::Sig
+    extend T::Helpers
 
-    include T::Props
-    include T::Props::Constructor
+    const :default_account, String
 
-    include RuleInterface
+    sig {override.params(txn: LedgerGen::Transaction, row: Row).returns(T::Boolean)}
+    def build_transaction(txn, row)
+      txn.cleared!
+      txn.date row.txn_date
+      txn.payee row.description
+      txn.comment "tiller_id: #{row.txn_id}"
+
+      txn.posting default_account, row.amount * -1
+      txn.posting row.account
+
+      true
+    end
+  end
+
+  class RegexpRule < AbstractRule
+    extend T::Sig
 
     const :match, Regexp
     const :account, String
+    const :source_account, T.nilable(String)
 
-    sig {override.params(row: Row).returns(T.nilable(String))}
+    sig {override.params(txn: LedgerGen::Transaction, row: Row).returns(T::Boolean)}
+    def build_transaction(txn, row)
+      account = account_for_row(row)
+      return false if account.nil?
+
+      txn.cleared!
+      txn.date row.txn_date
+      txn.payee row.description
+      txn.comment "tiller_id: #{row.txn_id}"
+
+      txn.posting account, row.amount * -1
+      txn.posting row.account
+
+      true
+    end
+
+    private
+
+    sig {params(row: Row).returns(T.nilable(String))}
     def account_for_row(row)
       if match.match(row.description)
-        return account
+        if source_account && source_account != row.account
+          return nil
+        else
+          return account
+        end
       end
 
       nil
@@ -73,9 +111,8 @@ module LedgerTillerExport
     include T::Props
     include T::Props::Constructor
 
-    const :rules, T::Array[RuleInterface]
+    const :rules, T::Array[AbstractRule]
     const :sheets, T::Array[Sheet]
-    const :default_account, String
     const :ledger_pretty_print_options, String
 
     const :session, GoogleDrive::Session, factory: ->{GoogleDrive::Session.from_config('.config.json')}
@@ -83,7 +120,7 @@ module LedgerTillerExport
 
     sig do
       params(
-        rules: T::Array[RuleInterface],
+        rules: T::Array[AbstractRule],
         spreadsheet: T.nilable(String),
         worksheet: T.nilable(String),
         sheets: T.nilable(T::Array[Sheet]),
@@ -97,11 +134,10 @@ module LedgerTillerExport
       if spreadsheet && worksheet
         sheets << Sheet.new(spreadsheet: spreadsheet, worksheet: worksheet)
       end
-      
+
       super(
-        rules: rules,
+        rules: rules + [DefaultRule.new(default_account: default_account)],
         sheets: sheets,
-        default_account: default_account,
         ledger_pretty_print_options: ledger_pretty_print_options,
       )
 
@@ -157,26 +193,12 @@ module LedgerTillerExport
       Set.new(raw_tags.strip.split(/(\n|,)/).map(&:strip))
     end
 
-    sig {params(row: Row).returns(String)}
-    def account_for_row(row)
-      rules.each do |rule|
-        account = rule.account_for_row(row)
-        return account if account
-      end
-
-      default_account
-    end
-
     sig {params(row: Row).void}
     def journal_transaction(row)
       journal.transaction do |txn|
-        txn.cleared!
-        txn.date row.txn_date
-        txn.payee row.description
-        txn.comment "tiller_id: #{row.txn_id}"
-
-        txn.posting account_for_row(row), row.amount * -1
-        txn.posting row.account
+        rules.each do |rule|
+          return true if rule.build_transaction(txn, row)
+        end
       end
     end
 
