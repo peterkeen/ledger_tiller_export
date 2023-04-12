@@ -58,15 +58,13 @@ GEM
       sorbet-runtime
     memoist (0.16.2)
     mini_mime (1.1.0)
-    mini_portile2 (2.5.1)
     multi_json (1.15.0)
     multipart-post (2.1.1)
-    nokogiri (1.11.5)
-      mini_portile2 (~> 2.5.0)
+    nokogiri (1.14.3-x86_64-linux)
       racc (~> 1.4)
     os (1.1.1)
     public_suffix (4.0.6)
-    racc (1.5.2)
+    racc (1.6.2)
     rake (13.0.1)
     representable (3.1.1)
       declarative (< 0.1.0)
@@ -96,13 +94,13 @@ GEM
     sorbet (0.5.5648)
       sorbet-static (= 0.5.5648)
     sorbet-runtime (0.5.6425)
-    sorbet-static (0.5.5648-universal-darwin-14)
+    sorbet-static (0.5.5648-x86_64-linux)
     trailblazer-option (0.1.1)
     uber (0.1.0)
     webrick (1.7.0)
 
 PLATFORMS
-  ruby
+  x86_64-linux
 
 DEPENDENCIES
   bundler (~> 2)
